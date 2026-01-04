@@ -1,0 +1,343 @@
+import random
+import warnings
+from pathlib import Path
+from typing import Literal, Optional, Callable
+
+import keyboard
+import mouse
+import mss
+import mss.tools
+from pyautogui import locateCenterOnScreen, ImageNotFoundException
+
+from models import Field, FieldValue, Point
+
+IMAGE_DIR = Path(__file__).parent / "images"
+
+
+class MineSweeperSolver:
+    """
+    Automated Minesweeper solver that interacts with the online Minesweeper game.
+
+    This class uses screen capture and image recognition to play Minesweeper automatically.
+    It captures the game board, analyzes field states, and makes moves by simulating mouse clicks.
+
+    Attributes:
+        DIFFICULTY_TO_SIZE: Mapping of difficulty levels to (columns, rows, mines) tuples
+        SMILEY_RAD: Radius in pixels of the smiley face button
+        COLOR_TO_FIELD_VALUE: Mapping of RGB colors to field values (numbers 1-8, empty, etc.)
+    """
+
+    # Board dimensions for each difficulty level (COLUMNS, ROWS, MINES)
+    DIFFICULTY_TO_SIZE = {
+        "beginner": (9, 9, 10),
+        "intermediate": (16, 16, 40),
+        "expert": (30, 16, 99)
+    }
+
+    # Smiley button dimensions (cube radius)
+    SMILEY_RAD = 17
+
+    # Pixel positions for checking game state (RELATIVE TO THE SMILEY IMG)
+    DEAD_SMILEY_MOUTH_CORNER_POS = Point(8, 25)  # Position to check if game is lost
+    COOL_SMILEY_GLASSES_CENTER_POS = Point(16, 11)  # Position to check if game is won
+
+    # Offset from field center to check the upper edge color
+    UNDISCOVERED_FIELD_BORDER_DY = 12
+
+    # Color constants
+    BLACK = (0, 0, 0)
+
+    # RGB color to field value mapping
+    # Each number (1-8) has a unique color, empty fields are represented by specific colors
+    COLOR_TO_FIELD_VALUE = {
+        (255, 255, 255): FieldValue.UNDISCOVERED,  # White upper edge = undiscovered field
+        (0, 0, 255): FieldValue.ONE,  # Blue
+        (0, 123, 0): FieldValue.TWO,  # Green
+        (255, 0, 0): FieldValue.THREE,  # Red
+        (0, 0, 123): FieldValue.FOUR,  # Dark blue
+        (128, 0, 0): FieldValue.FIVE,  # Dark red
+        (19, 130, 130): FieldValue.SIX,  # Teal
+        (0, 0, 0): FieldValue.SEVEN,  # Black
+        (123, 123, 123): FieldValue.EIGHT,  # Gray
+    }
+
+    def __init__(
+            self,
+            difficulty: Literal["beginner", "intermediate", "expert"] = "beginner",
+            custom: Optional[tuple[int, int, int]] = None,
+            play_games: int = 1,
+            next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None
+    ) -> None:
+        """
+        Initialize the Minesweeper solver with board detection and configuration.
+
+        This constructor locates the game board on screen, sets up board dimensions,
+        and initializes all fields with their screen positions.
+
+        :param difficulty: The difficulty level ("beginner", "intermediate", or "expert")
+        :param custom: Override difficulty with custom dimensions (columns, rows, mines)
+        :param play_games: Number of games to play (-1 for infinite until won)
+        :raises ValueError: If game elements cannot be located on screen
+        """
+        warnings.warn(
+            "MineSweeperSolver is made to work mainly on https://minesweeperonline.com/#beginner-200"
+            "\nDifficulty can be changed, however not zoom-size",
+            UserWarning
+        )
+
+        # Locate key game elements on screen
+        self.origin_square_pos: Point[int, int] = self.locate_image('first_field')
+        self.smiley_pos: Point[int, int] = self.locate_image('happy_smiley')
+
+        # Board cell dimensions in pixels
+        self.square_px_diameter = 32
+        self.play_games = play_games
+
+        # Determine board dimensions based on difficulty or custom settings
+        self.columns: int = self.DIFFICULTY_TO_SIZE[difficulty][0] if not custom else custom[0]
+        self.rows: int = self.DIFFICULTY_TO_SIZE[difficulty][1] if not custom else custom[1]
+
+        def _compute_field_positions_rel_to_board(screen_pos_x: int, screen_pos_y: int) -> Point:
+            """
+            Convert absolute screen coordinates to relative board image coordinates.
+
+            This is needed because we capture the board region and need to map field positions
+            to pixel coordinates within that captured image.
+            """
+            center_rel_to_board_img: Point = Point(
+                screen_pos_x - self.origin_square_pos.x + self.square_px_rad,
+                screen_pos_y - self.origin_square_pos.y + self.square_px_rad
+            )
+            return center_rel_to_board_img
+
+        self.square_px_rad = int(self.square_px_diameter / 2)
+
+        # Initialize the game board with all fields
+        # Each field knows its position on screen and within the board image
+        self.board: list[list[Field]] = [
+            [Field(
+                pos_to_screen=Point(*self.get_center_field_pos(r, c)),
+                pos_to_board=_compute_field_positions_rel_to_board(*self.get_center_field_pos(r, c)),
+                field_id=c + r * self.columns,
+            ) for c in range(self.columns)]
+            for r in range(self.rows)
+        ]
+
+        # Define the screen region to capture for the game board
+        self.board_region = {
+            "left": self.origin_square_pos.x - self.square_px_rad,
+            "top": self.origin_square_pos.y - self.square_px_rad,
+            "width": self.columns * self.square_px_diameter,
+            "height": self.rows * self.square_px_diameter
+        }
+
+        # Define the screen region to capture for the smiley button
+        self.smiley_region = {
+            "left": self.smiley_pos.x - self.SMILEY_RAD,
+            "top": self.smiley_pos.y - self.SMILEY_RAD,
+            "width": 34,
+            "height": 34
+        }
+
+        # Game statistics storage (moves played, wins/losses, etc.)
+        self.game_history: dict[int, dict[str, int | bool]] = {}
+
+        self.next_move = next_move_strategy
+        self.sct = mss.mss()
+
+    def get_center_field_pos(self, row: int, column: int) -> tuple[int, int]:
+        """
+        Calculate the absolute screen pixel position for the center of a field.
+
+        :param row: The row index of the field (0-indexed)
+        :param column: The column index of the field (0-indexed)
+        :return: Tuple of (x, y) screen coordinates
+        """
+        x_screen_pos: int = int(self.origin_square_pos.x + (column * self.square_px_diameter))
+        y_screen_pos: int = int(self.origin_square_pos.y + (row * self.square_px_diameter))
+        return x_screen_pos, y_screen_pos
+
+    def start(self) -> dict[int, dict[str, int | bool]]:
+        """
+        Main game loop that plays the specified number of Minesweeper games.
+
+        This method continuously:
+        1. Makes a move
+        2. Checks the game status
+        3. Updates the board state or resets if game ended
+
+        :return: Dictionary containing game history and statistics
+        :raises ValueError: If smiley button cannot be located
+        """
+        games_completed = 0
+
+        smiley_pos = self.locate_image('happy_smiley')
+        if smiley_pos is None:
+            raise ValueError("Smiley not found")
+
+        # Main game loop
+        while games_completed < self.play_games:
+            self.next_move(self)
+
+            game_status = self.check_game_status()
+            match game_status:
+                case 'ongoing':
+                    # Game still in progress, update board state
+                    self.update_board()
+
+                case 'lost':
+                    mouse.move(smiley_pos.x, smiley_pos.y)
+                    mouse.click()
+
+                    games_completed += 1
+                    print(f"{games_completed}'s Game Lost ( ´･･)ﾉ(._.`), Restarting... ")
+
+                    self.reset_board()
+
+                case 'won':
+                    games_completed += 1
+                    print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
+                    return self.game_history
+
+    def update_board(self):
+        """
+        Capture the current game board and update internal field states.
+
+        This method:
+        1. Takes a screenshot of the board region
+        2. Analyzes each undiscovered field by checking pixel colors
+        3. Updates field values based on colors (numbers, empty, etc.)
+
+        Color detection works by checking:
+        - Edge color to see if field is still undiscovered
+        - Center color to determine the number or if it's empty
+        """
+        # Capture the current board state from screen
+        board_screenshot = self.sct.grab(self.board_region)
+        # Optional: Save screenshot for debugging
+        # mss.tools.to_png(board_screenshot.rgb, board_screenshot.size, output="screenshot.png")
+
+        undiscovered_fields = [
+            field for row in self.board
+            for field in row
+            if field.value == FieldValue.UNDISCOVERED
+        ]
+
+        for field in undiscovered_fields:
+            # Check the upper edge color to see if field is still covered
+            edge_color: tuple[int, int, int] = board_screenshot.pixel(
+                field.pos_to_board.x,
+                field.pos_to_board.y - self.UNDISCOVERED_FIELD_BORDER_DY
+            )
+
+            # If edge is still white/undiscovered color, skip this field
+            if MineSweeperSolver.COLOR_TO_FIELD_VALUE.get(edge_color, None) == FieldValue.UNDISCOVERED:
+                continue
+
+            center_color: tuple[int, int, int] = board_screenshot.pixel(
+                field.pos_to_board.x,
+                field.pos_to_board.y
+            )
+
+            field.value = MineSweeperSolver.COLOR_TO_FIELD_VALUE.get(
+                center_color,
+                FieldValue.EMPTY
+            )
+
+    @staticmethod
+    def locate_image(
+            image_name: Literal['cool_smiley', 'dead_smiley', 'first_field', 'happy_smiley'],
+            region: Optional[dict[str, int]] = None
+    ) -> Point | None:
+        """
+        Find an image on the screen and return its center position.
+
+        Uses template matching to locate specific game elements like the smiley button
+        or the first field of the board.
+
+        :param image_name: Name of the image to locate (from images/ folder)
+        :param region: Optional screen region to search within
+                      {"left": int, "top": int, "width": int, "height": int}
+        :return: Point(x, y) of the image center, or None if not found
+        """
+        try:
+            image_path = str(IMAGE_DIR / f"{image_name}.png")
+
+            center_position = locateCenterOnScreen(image_path, region=region)
+            return center_position
+        except ImageNotFoundException:
+            return None
+
+    def check_game_status(self) -> Literal['won', 'lost', 'ongoing']:
+        """
+        Determine the current game state by analyzing the smiley button.
+
+        The smiley face changes based on game state:
+        - Happy smiley (😊) → Game ongoing
+        - Dead smiley (😵) → Game lost (hit a mine)
+        - Cool smiley (😎) → Game won!
+
+        Detection works by checking specific pixels on the smiley image:
+        - Dead: Check mouth corner for black pixel
+        - Cool: Check glasses center for black pixel
+
+        :return: 'won' if game is won, 'lost' if hit a mine, 'ongoing' if still playing
+        """
+        smiley_screenshot = solver.sct.grab(self.smiley_region)
+
+        dead_smiley_pixel = smiley_screenshot.pixel(*self.DEAD_SMILEY_MOUTH_CORNER_POS)
+        if dead_smiley_pixel == self.BLACK:
+            return 'lost'
+
+        cool_smiley_pixel = smiley_screenshot.pixel(*self.COOL_SMILEY_GLASSES_CENTER_POS)
+        if cool_smiley_pixel == self.BLACK:
+            return 'won'
+
+        return 'ongoing'
+
+    def log_game(self):
+        """
+        Log game statistics and history (not yet implemented).
+
+        Intended to track:
+        - Move order and sequence
+        - Number of moves made
+        - Game result (won/lost)
+        - Time to completion
+        """
+        ...
+
+    def reset_board(self):
+        """
+        Reset the internal board state after a game ends.
+
+        This resets all fields to undiscovered state, preparing for a new game.
+        Called after clicking the smiley button to restart.
+        """
+        undiscovered_val = FieldValue.UNDISCOVERED
+
+        for row in self.board:
+            for field in row:
+                field.value = undiscovered_val
+                field.safe = False
+
+
+if __name__ == '__main__':
+    solver = MineSweeperSolver(
+        difficulty="intermediate",
+        play_games=260
+    )
+
+    keyboard.wait('esc')
+
+    # Option 1: Run normally
+    # solver.start()
+
+    # Option 2: Run with profiling to analyze performance
+    from line_profiler import LineProfiler
+
+    profiler = LineProfiler()
+    profiler.add_class(cls=MineSweeperSolver)
+
+    profiler.run('solver.start()')
+    profiler.print_stats(output_unit=1.0)
