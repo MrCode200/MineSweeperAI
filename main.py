@@ -13,8 +13,8 @@ def main():
         ═══════════════════════════════════════════════════════════════════════
 
         📋 ABOUT self.board:
-        • self.board is a 2D list (list[list[Field]]) representing the game board
-        • Access fields using: self.board[row][column]
+        • solver.board is a 2D list (list[list[Field]]) representing the game board
+        • Access fields using: solver.board[row][column]
         • Each Field has these important attributes:
           - field.value: The current state (see FieldValue enum below)
           - field.pos_to_screen: Point(x, y) - screen coordinates for clicking
@@ -33,7 +33,7 @@ def main():
         • FieldValue.EIGHT         → Revealed with 8 adjacent mines (⊙_⊙;)
 
         🎯 HOW TO MAKE A MOVE:
-        1. Analyze self.board to find safe fields
+        1. Analyze solver.board to find safe fields
         2. Get the field's screen position: field.pos_to_screen
         3. Move mouse: mouse.move(x, y)
         4. Click: mouse.click()
@@ -67,14 +67,17 @@ def main():
             mouse.move(click_x, click_y)
             mouse.click()
 
-    solver = MineSweeperSolver(
+    ms_solver = MineSweeperSolver(
         difficulty='beginner',
         custom=None,
         play_games=3,
         next_move_strategy=next_move
     )
-    stats = solver.start()
+    stats = ms_solver.start()
     print(stats)
 
 if __name__ == '__main__':
+    import keyboard
+    print("Press esc to start! (Works also when on minesweeper website) ( •̀ ω •́ )✧")
+    keyboard.wait("esc")
     main()

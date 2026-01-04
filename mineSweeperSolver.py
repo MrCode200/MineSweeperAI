@@ -1,4 +1,3 @@
-import random
 import warnings
 from pathlib import Path
 from typing import Literal, Optional, Callable
@@ -88,6 +87,15 @@ class MineSweeperSolver:
         # Locate key game elements on screen
         self.origin_square_pos: Point[int, int] = self.locate_image('first_field')
         self.smiley_pos: Point[int, int] = self.locate_image('happy_smiley')
+        if self.origin_square_pos is None or self.smiley_pos is None:
+            raise RuntimeError(
+                "Failed to detect Minesweeper game window.\n"
+                "Please ensure:\n"
+                "1. The game window is open and visible\n"
+                "2. You're using a supported version of Minesweeper\n"
+                "3. The game is in a fresh/starting state\n"
+                "4. The window is not minimized or covered by other windows"
+            )
 
         # Board cell dimensions in pixels
         self.square_px_diameter = 32
@@ -283,7 +291,7 @@ class MineSweeperSolver:
 
         :return: 'won' if game is won, 'lost' if hit a mine, 'ongoing' if still playing
         """
-        smiley_screenshot = solver.sct.grab(self.smiley_region)
+        smiley_screenshot = self.sct.grab(self.smiley_region)
 
         dead_smiley_pixel = smiley_screenshot.pixel(*self.DEAD_SMILEY_MOUTH_CORNER_POS)
         if dead_smiley_pixel == self.BLACK:
