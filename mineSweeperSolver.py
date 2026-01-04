@@ -104,6 +104,7 @@ class MineSweeperSolver:
         # Determine board dimensions based on difficulty or custom settings
         self.columns: int = self.DIFFICULTY_TO_SIZE[difficulty][0] if not custom else custom[0]
         self.rows: int = self.DIFFICULTY_TO_SIZE[difficulty][1] if not custom else custom[1]
+        self.total_mines: int = self.DIFFICULTY_TO_SIZE[difficulty][2] if not custom else custom[2]
 
         def _compute_field_positions_rel_to_board(screen_pos_x: int, screen_pos_y: int) -> Point:
             """
@@ -191,7 +192,7 @@ class MineSweeperSolver:
             match game_status:
                 case 'ongoing':
                     # Game still in progress, update board state
-                    self.update_board()
+                    self._update_board()
 
                 case 'lost':
                     mouse.move(smiley_pos.x, smiley_pos.y)
@@ -200,14 +201,37 @@ class MineSweeperSolver:
                     games_completed += 1
                     print(f"{games_completed}'s Game Lost ( ´･･)ﾉ(._.`), Restarting... ")
 
-                    self.reset_board()
+                    self._reset_board()
 
                 case 'won':
                     games_completed += 1
                     print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
                     return self.game_history
 
-    def update_board(self):
+    # --- Static Utility Methods ---
+    @staticmethod
+    def click_field(field: Field):
+        # Get the screen coordinates of the chosen field
+        click_x, click_y = field.pos_to_screen
+
+        # Move mouse to the field and click it
+        mouse.move(click_x, click_y)
+        mouse.click()
+
+    @staticmethod
+    def toggle_field_flag(field: Field):
+        field.value = FieldValue.FLAGGED if field.value != FieldValue.FLAGGED else FieldValue.UNDISCOVERED
+
+        # Get the screen coordinates of the chosen field
+        click_x, click_y = field.pos_to_screen
+
+        # Move mouse to the field and click it
+        mouse.move(click_x, click_y)
+        keyboard.press('space')
+
+    # -------------------------------
+
+    def _update_board(self):
         """
         Capture the current game board and update internal field states.
 
@@ -315,7 +339,7 @@ class MineSweeperSolver:
         """
         ...
 
-    def reset_board(self):
+    def _reset_board(self):
         """
         Reset the internal board state after a game ends.
 
@@ -327,8 +351,6 @@ class MineSweeperSolver:
         for row in self.board:
             for field in row:
                 field.value = undiscovered_val
-                field.safe = False
-
 
 if __name__ == '__main__':
     solver = MineSweeperSolver(

@@ -9,8 +9,10 @@ class Point(NamedTuple):
 
 
 class FieldValue(Enum):
-    UNDISCOVERED = -1
+    UNDISCOVERED = -2
+    FLAGGED = -1
     EMPTY = 0
+
     ONE = 1
     TWO = 2
     THREE = 3
@@ -24,12 +26,12 @@ class FieldValue(Enum):
 @dataclass(slots=True)
 class Field:
     """
-    Pos is the absolute position on screen
-    field_id is the number of the field, counted from vertical to horizontal
-    safe   a flag to identify if the Field contains a Bomb logically or not
+    :param pos_to_screen: Pixel Position relative to screen (the center of the field)
+    :param pos_to_board: Position relative to the board
+    :param field_id: Field ID
+    :param value: Field Value (Undiscovered, Flagged, Empty, One, two ...)
     """
     pos_to_screen: Point[int, int]
     pos_to_board: Point[int, int]
     field_id: int
     value: FieldValue = FieldValue.UNDISCOVERED
-    safe: bool = False
