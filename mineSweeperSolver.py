@@ -2,7 +2,6 @@ import warnings
 from pathlib import Path
 from typing import Literal, Optional, Callable
 
-import keyboard
 import mouse
 import mss
 import mss.tools
@@ -359,8 +358,7 @@ if __name__ == '__main__':
         play_games=260
     )
 
-    keyboard.wait('esc')
-
+    mouse.wait('right')
     # Option 1: Run normally
     # solver.start()
 

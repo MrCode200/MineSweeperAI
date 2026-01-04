@@ -76,8 +76,8 @@ def main():
 
 
 if __name__ == '__main__':
-    import keyboard
+    import mouse
 
-    print("Press esc to start! (Works also when on minesweeper website) ( •̀ ω •́ )✧")
-    keyboard.wait("esc")
+    print("Right click to start! (Works also when on minesweeper website) ( •̀ ω •́ )✧")
+    mouse.wait("right")
     main()
