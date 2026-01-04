@@ -1,10 +1,11 @@
+import random
+
 from mineSweeperSolver import MineSweeperSolver
 from models import FieldValue
-import random
-import mouse
+
 
 def main():
-    def next_move(solver):
+    def next_move(solver: MineSweeperSolver):
         """
         Decide and execute the next move in the game (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧
 
@@ -33,21 +34,22 @@ def main():
         • FieldValue.EIGHT         → Revealed with 8 adjacent mines (⊙_⊙;)
 
         🎯 HOW TO MAKE A MOVE:
-        1. Analyze solver.board to find safe fields
-        2. Get the field's screen position: field.pos_to_screen
-        3. Move mouse: mouse.move(x, y)
-        4. Click: mouse.click()
+        1. Analyze solver.board to find safe field
+        2. Total amount of mines are listed in solver.total_mines
+        3. To Flag/Unflag use solver.toggle_field_flag(field)
+        4. To Click a field use solver.click_field(field)
 
         💡 EXAMPLE STRATEGY (CURRENT):
         The code below shows a RANDOM move strategy - it picks any undiscovered
         field and clicks it. This is just for demonstration! (´｡• ᵕ •｡`)
 
         Replace this with your smart AI logic! ｡◕‿◕｡
+        Good Luck :))
         ═══════════════════════════════════════════════════════════════════════
         """
 
         # ---------------------------------------------------------------------
-        # PREMADE CUSTOM AI
+        # PRE-MADE CUSTOM AI
         # _____________________________________________________________________
         undiscovered_fields = [
             field for row in solver.board
@@ -60,13 +62,9 @@ def main():
             # This randomly picks an undiscovered field - not a good strategy!
             chosen_field = random.choice(undiscovered_fields)
 
-            # Get the screen coordinates of the chosen field
-            click_x, click_y = chosen_field.pos_to_screen
+            solver.click_field(chosen_field)
 
-            # Move mouse to the field and click it
-            mouse.move(click_x, click_y)
-            mouse.click()
-
+    # --- Class Configs ---
     ms_solver = MineSweeperSolver(
         difficulty='beginner',
         custom=None,
@@ -76,8 +74,10 @@ def main():
     stats = ms_solver.start()
     print(stats)
 
+
 if __name__ == '__main__':
     import keyboard
+
     print("Press esc to start! (Works also when on minesweeper website) ( •̀ ω •́ )✧")
     keyboard.wait("esc")
     main()
