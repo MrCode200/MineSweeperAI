@@ -36,7 +36,7 @@ def main():
         🎯 HOW TO MAKE A MOVE:
         1. Analyze solver.board to find safe field
         2. Total amount of mines are listed in solver.total_mines
-        3. To Flag/Unflag use solver.toggle_field_flag(field)
+        3. To Flag/Unflag use solver.toggle_flag(field)
         4. To Click a field use solver.click_field(field)
 
         💡 EXAMPLE STRATEGY (CURRENT):

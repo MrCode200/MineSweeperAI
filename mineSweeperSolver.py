@@ -6,6 +6,7 @@ import keyboard
 import mouse
 import mss
 import mss.tools
+from mouse import RIGHT
 from pyautogui import locateCenterOnScreen, ImageNotFoundException
 
 from models import Field, FieldValue, Point
@@ -219,7 +220,7 @@ class MineSweeperSolver:
         mouse.click()
 
     @staticmethod
-    def toggle_field_flag(field: Field):
+    def toggle_flag(field: Field):
         field.value = FieldValue.FLAGGED if field.value != FieldValue.FLAGGED else FieldValue.UNDISCOVERED
 
         # Get the screen coordinates of the chosen field
@@ -227,7 +228,7 @@ class MineSweeperSolver:
 
         # Move mouse to the field and click it
         mouse.move(click_x, click_y)
-        keyboard.press('space')
+        mouse.click(RIGHT)
 
     # -------------------------------
 
