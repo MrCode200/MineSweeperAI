@@ -51,6 +51,10 @@ def main():
         # ---------------------------------------------------------------------
         # PRE-MADE CUSTOM AI
         # _____________________________________________________________________
+        # This strats win chance is (71! * 10!) / 81!
+        # OR 5.32 * 10^-13 = 0.000000000000532 % win probability
+        # OR 1 chance in 1.88 trillion
+        # CAN YOU DO BETTER ?(‾◡◝)
         undiscovered_fields = [
             field for row in solver.board
             for field in row
@@ -68,7 +72,7 @@ def main():
     ms_solver = MineSweeperSolver(
         difficulty='beginner',
         custom=None,
-        play_games=3,
+        play_games=1000,
         next_move_strategy=next_move
     )
     stats = ms_solver.start()

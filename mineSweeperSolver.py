@@ -352,10 +352,29 @@ class MineSweeperSolver:
             for field in row:
                 field.value = undiscovered_val
 
+
 if __name__ == '__main__':
-    solver = MineSweeperSolver(
-        difficulty="intermediate",
-        play_games=260
+    import random
+    from line_profiler import LineProfiler
+
+
+    def next_move(solver: MineSweeperSolver):
+        undiscovered_fields = [
+            field for row in solver.board
+            for field in row
+            if field.value == FieldValue.UNDISCOVERED
+        ]
+
+        if undiscovered_fields:
+            chosen_field = random.choice(undiscovered_fields)
+
+            solver.click_field(chosen_field)
+
+
+    ms_solver = MineSweeperSolver(
+        difficulty="beginner",
+        play_games=260,
+        next_move_strategy=next_move
     )
 
     mouse.wait('right')
@@ -363,7 +382,6 @@ if __name__ == '__main__':
     # solver.start()
 
     # Option 2: Run with profiling to analyze performance
-    from line_profiler import LineProfiler
 
     profiler = LineProfiler()
     profiler.add_class(cls=MineSweeperSolver)
