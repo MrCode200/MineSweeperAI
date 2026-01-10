@@ -15,16 +15,21 @@ def main():
         🎮 WELCOME TO THE MOVE LOGIC! THIS IS WHERE YOU IMPLEMENT YOUR AI! 🎮
         ═══════════════════════════════════════════════════════════════════════
 
+        ABOUT solver
+        Contains the attributes:
+        - solver.moves_made: int => How many moves this game has been made
+
         📋 ABOUT self.board:
         • solver.board is a 2D list (list[list[Field]]) representing the game board
         • Access fields using: solver.board[row][column]
         • Each Field has these important attributes:
           - field.value: The current state (see FieldValue enum below)
           - field.pos_to_screen: Point(x, y) - screen coordinates for clicking
-          - field.safe: Boolean indicating if field is marked as safe
+          - field.id: The unique id created through (col + row * self.columns)
 
         🔢 FIELD VALUES (what each field can be):
         • FieldValue.UNDISCOVERED  → Hidden field, not yet clicked (ﾟοﾟ人))
+        • FieldValue.FLAGGED       → Flagged Field which may contain a bomb ⊙.☉
         • FieldValue.EMPTY         → Revealed empty field (0 adjacent mines) ＼(^o^)／
         • FieldValue.ONE           → Revealed with 1 adjacent mine
         • FieldValue.TWO           → Revealed with 2 adjacent mines

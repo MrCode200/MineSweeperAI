@@ -103,12 +103,17 @@ class MineSweeperSolver:
 
         # Board cell dimensions in pixels
         self.square_px_diameter = 32
-        self.play_games = play_games
 
         # Determine board dimensions based on difficulty or custom settings
         self.columns: int = self.DIFFICULTY_TO_SIZE[difficulty][0] if not custom else custom[0]
         self.rows: int = self.DIFFICULTY_TO_SIZE[difficulty][1] if not custom else custom[1]
         self.total_mines: int = self.DIFFICULTY_TO_SIZE[difficulty][2] if not custom else custom[2]
+
+        # stats
+        self.play_games = play_games
+        self.moves_made: int = 0
+        self.total_moves: int = 0
+        self.wins: int = 0
 
         def _compute_field_positions_rel_to_board(screen_pos_x: int, screen_pos_y: int) -> Point:
             """
@@ -177,6 +182,7 @@ class MineSweeperSolver:
         mouse.click()
 
         self._reset_board()
+        self.moves_made = 0
 
     def start(self, next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None) -> dict[
         int, dict[str, int | bool]]:
@@ -200,6 +206,8 @@ class MineSweeperSolver:
         # Main game loop
         while games_completed < self.play_games:
             next_move_strategy(self)
+            self.moves_made += 1
+            self.total_moves += 1
 
             game_status = self.check_game_status()
             match game_status:
@@ -214,6 +222,7 @@ class MineSweeperSolver:
 
                 case 'won':
                     games_completed += 1
+                    self.wins += 1
                     print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
 
                     if self.stop_after_win:
