@@ -113,7 +113,7 @@ class MineSweeperSolver:
         self.play_games = play_games
         self.moves_made: int = 0
         self.total_moves: int = 0
-        self.least_moves_to_win: int = 0
+        self.win_with_least_moves_made: int = 0
         self.wins: int = 0
 
         def _compute_field_positions_rel_to_board(screen_pos_x: int, screen_pos_y: int) -> Point:
@@ -159,7 +159,7 @@ class MineSweeperSolver:
         }
 
         # Game statistics storage (moves played, wins/losses, etc.)
-        self.game_history: dict[int, dict[str, int | bool]] = {}
+        self.stats: dict[int, dict[str, int | bool]] = {}
 
         self.sct = mss.mss()
 
@@ -185,8 +185,7 @@ class MineSweeperSolver:
         self._reset_board()
         self.moves_made = 0
 
-    def start(self, next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None) -> dict[
-        int, dict[str, int | bool]]:
+    def start(self, next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None) -> dict[str, any]:
         """
         Main game loop that plays the specified number of Minesweeper games.
 
@@ -224,13 +223,23 @@ class MineSweeperSolver:
                 case 'won':
                     games_completed += 1
                     self.wins += 1
-                    self.least_moves_to_win = (self.moves_made if self.moves_made < self.least_moves_to_win
-                                               else self.least_moves_to_win)
+                    self.win_with_least_moves_made = (self.moves_made if self.moves_made < self.win_with_least_moves_made
+                                               else self.win_with_least_moves_made)
                     print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
 
                     if self.stop_after_win:
-                        return self.game_history
+                        return self.create_stats()
                     self.reset_board(smiley_pos)
+
+    def create_stats(self) -> dict[str, any]:
+        stats = {
+            'Games played': self.play_games,
+            'Wins': self.wins,
+            'Losses': self.play_games - self.wins,
+            'Win percentage': self.wins/self.play_games,
+            'Win with least Moves made': self.win_with_least_moves_made
+        }
+        return stats
 
     # --- Static Utility Methods ---
     @staticmethod
