@@ -113,6 +113,7 @@ class MineSweeperSolver:
         self.play_games = play_games
         self.moves_made: int = 0
         self.total_moves: int = 0
+        self.least_moves_to_win: int = 0
         self.wins: int = 0
 
         def _compute_field_positions_rel_to_board(screen_pos_x: int, screen_pos_y: int) -> Point:
@@ -223,6 +224,8 @@ class MineSweeperSolver:
                 case 'won':
                     games_completed += 1
                     self.wins += 1
+                    self.least_moves_to_win = (self.moves_made if self.moves_made < self.least_moves_to_win
+                                               else self.least_moves_to_win)
                     print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
 
                     if self.stop_after_win:
