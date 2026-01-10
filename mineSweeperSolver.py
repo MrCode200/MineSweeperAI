@@ -65,7 +65,7 @@ class MineSweeperSolver:
             difficulty: Literal["beginner", "intermediate", "expert"] = "beginner",
             custom: Optional[tuple[int, int, int]] = None,
             play_games: int = 1,
-            next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None
+            stop_after_win: bool = True,
     ) -> None:
         """
         Initialize the Minesweeper solver with board detection and configuration.
@@ -76,6 +76,7 @@ class MineSweeperSolver:
         :param difficulty: The difficulty level ("beginner", "intermediate", or "expert")
         :param custom: Override difficulty with custom dimensions (columns, rows, mines)
         :param play_games: Number of games to play (-1 for infinite until won)
+        :param stop_after_win: Stop after winning a game
         :raises ValueError: If game elements cannot be located on screen
         """
         warnings.warn(
@@ -85,6 +86,9 @@ class MineSweeperSolver:
         )
 
         # Locate key game elements on screen
+        self.play_games = play_games
+        self.stop_after_win = stop_after_win
+
         self.origin_square_pos: Point[int, int] = self.locate_image('first_field')
         self.smiley_pos: Point[int, int] = self.locate_image('happy_smiley')
         if self.origin_square_pos is None or self.smiley_pos is None:
@@ -127,7 +131,7 @@ class MineSweeperSolver:
             [Field(
                 pos_to_screen=Point(*self.get_center_field_pos(r, c)),
                 pos_to_board=_compute_field_positions_rel_to_board(*self.get_center_field_pos(r, c)),
-                field_id=c + r * self.columns,
+                id=self.id_from_rc(r, c),
             ) for c in range(self.columns)]
             for r in range(self.rows)
         ]
@@ -151,8 +155,10 @@ class MineSweeperSolver:
         # Game statistics storage (moves played, wins/losses, etc.)
         self.game_history: dict[int, dict[str, int | bool]] = {}
 
-        self.next_move = next_move_strategy
         self.sct = mss.mss()
+
+    def id_from_rc(self, row: int, col: int) -> int:
+        return col + row * self.columns
 
     def get_center_field_pos(self, row: int, column: int) -> tuple[int, int]:
         """
@@ -166,7 +172,14 @@ class MineSweeperSolver:
         y_screen_pos: int = int(self.origin_square_pos.y + (row * self.square_px_diameter))
         return x_screen_pos, y_screen_pos
 
-    def start(self) -> dict[int, dict[str, int | bool]]:
+    def reset_board(self, smiley_pos: Point[int, int]):
+        mouse.move(smiley_pos.x, smiley_pos.y)
+        mouse.click()
+
+        self._reset_board()
+
+    def start(self, next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None) -> dict[
+        int, dict[str, int | bool]]:
         """
         Main game loop that plays the specified number of Minesweeper games.
 
@@ -186,7 +199,7 @@ class MineSweeperSolver:
 
         # Main game loop
         while games_completed < self.play_games:
-            self.next_move(self)
+            next_move_strategy(self)
 
             game_status = self.check_game_status()
             match game_status:
@@ -195,18 +208,17 @@ class MineSweeperSolver:
                     self._update_board()
 
                 case 'lost':
-                    mouse.move(smiley_pos.x, smiley_pos.y)
-                    mouse.click()
-
                     games_completed += 1
+                    self.reset_board(smiley_pos)
                     print(f"{games_completed}'s Game Lost ( ´･･)ﾉ(._.`), Restarting... ")
-
-                    self._reset_board()
 
                 case 'won':
                     games_completed += 1
                     print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
-                    return self.game_history
+
+                    if self.stop_after_win:
+                        return self.game_history
+                    self.reset_board(smiley_pos)
 
     # --- Static Utility Methods ---
     @staticmethod
@@ -374,10 +386,8 @@ if __name__ == '__main__':
     ms_solver = MineSweeperSolver(
         difficulty="beginner",
         play_games=260,
-        next_move_strategy=next_move
     )
 
-    mouse.wait('right')
     # Option 1: Run normally
     # solver.start()
 
@@ -386,5 +396,5 @@ if __name__ == '__main__':
     profiler = LineProfiler()
     profiler.add_class(cls=MineSweeperSolver)
 
-    profiler.run('solver.start()')
+    profiler.run('ms_solver.start(next_move_strategy=next_move)')
     profiler.print_stats(output_unit=1.0)

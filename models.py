@@ -28,10 +28,10 @@ class Field:
     """
     :param pos_to_screen: Pixel Position relative to screen (the center of the field)
     :param pos_to_board: Position relative to the board
-    :param field_id: Field ID
+    :param id: Field ID
     :param value: Field Value (Undiscovered, Flagged, Empty, One, two ...)
     """
     pos_to_screen: Point[int, int]
     pos_to_board: Point[int, int]
-    field_id: int
+    id: int
     value: FieldValue = FieldValue.UNDISCOVERED

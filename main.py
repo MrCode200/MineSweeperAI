@@ -1,7 +1,9 @@
 import random
 
+import keyboard
+
 from mineSweeperSolver import MineSweeperSolver
-from models import FieldValue
+from models import FieldValue, Field
 
 
 def main():
@@ -55,7 +57,7 @@ def main():
         # OR 5.32 * 10^-13 = 0.000000000000532 % win probability
         # OR 1 chance in 1.88 trillion
         # CAN YOU DO BETTER ?(‾◡◝)
-        undiscovered_fields = [
+        undiscovered_fields: list[Field] = [
             field for row in solver.board
             for field in row
             if field.value == FieldValue.UNDISCOVERED
@@ -72,16 +74,15 @@ def main():
     ms_solver = MineSweeperSolver(
         difficulty='beginner',
         custom=None,
-        play_games=1000,
-        next_move_strategy=next_move
+        play_games=100,
     )
-    stats = ms_solver.start()
+    stats = ms_solver.start(next_move_strategy=next_move)
     print(stats)
 
 
 if __name__ == '__main__':
-    import mouse
-
-    print("Right click to start! (Works also when on minesweeper website) ( •̀ ω •́ )✧")
-    mouse.wait("right")
+    print("Right click to start! "
+          "(Works also when on minesweeper website: https://minesweeperonline.com/#beginner-200) \n"
+          "Good Luck ( •̀ ω •́ )✧")
+    keyboard.wait("enter")
     main()
