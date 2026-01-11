@@ -2,6 +2,7 @@ import warnings
 from pathlib import Path
 from typing import Literal, Optional, Callable
 
+import keyboard
 import mouse
 import mss
 import mss.tools
@@ -80,8 +81,8 @@ class MineSweeperSolver:
         :raises ValueError: If game elements cannot be located on screen
         """
         warnings.warn(
-            "MineSweeperSolver is made to work mainly on https://minesweeperonline.com/#beginner-200"
-            "\nDifficulty can be changed, however not zoom-size",
+            "MineSweeperSolver is made to work mainly on https://minesweeperonline.com/#beginner-200-left"
+            "\nDifficulty can be changed, however not zoom-size nor side: left",
             UserWarning
         )
 
@@ -113,7 +114,7 @@ class MineSweeperSolver:
         self.play_games = play_games
         self.moves_made: int = 0
         self.total_moves: int = 0
-        self.win_with_least_moves_made: int = 0
+        self.win_with_least_moves_made: int = self.rows * self.columns + 1
         self.wins: int = 0
 
         def _compute_field_positions_rel_to_board(screen_pos_x: int, screen_pos_y: int) -> Point:
@@ -185,7 +186,11 @@ class MineSweeperSolver:
         self._reset_board()
         self.moves_made = 0
 
-    def start(self, next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]] = None) -> dict[str, any]:
+    def start(
+            self,
+            next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]],
+            user_enters_username: bool = True
+    ) -> dict[str, any]:
         """
         Main game loop that plays the specified number of Minesweeper games.
 
@@ -194,10 +199,21 @@ class MineSweeperSolver:
         2. Checks the game status
         3. Updates the board state or resets if game ended
 
+        :param next_move_strategy: The function moving the board to be called at each cycle
+        :param user_enters_username: If the program after initial win should wait for user to input username.
+
         :return: Dictionary containing game history and statistics
         :raises ValueError: If smiley button cannot be located
         """
+        if user_enters_username and not self.stop_after_win:
+            raise AttributeError("user_enters_username = True only works if stop_after_win = True")
+        if user_enters_username:
+            warnings.warn(
+                "This may falsify the statistics which involve number of moves"
+            )
+
         games_completed = 0
+        last_game_status = ""
 
         smiley_pos = self.locate_image('happy_smiley')
         if smiley_pos is None:
@@ -205,11 +221,20 @@ class MineSweeperSolver:
 
         # Main game loop
         while games_completed < self.play_games:
+            game_status = self.check_game_status()
+            # Sometimes too fast, counts losses or wins double (faster than website reacts)
+            if game_status == last_game_status and game_status != 'ongoing':
+                continue
+            last_game_status = game_status
+
             next_move_strategy(self)
             self.moves_made += 1
             self.total_moves += 1
 
-            game_status = self.check_game_status()
+            # In case you beat highscore press 'esc' to be able to view new status
+            if not user_enters_username:
+                keyboard.press('esc')
+
             match game_status:
                 case 'ongoing':
                     # Game still in progress, update board state
@@ -226,17 +251,19 @@ class MineSweeperSolver:
                     self.win_with_least_moves_made = (self.moves_made if self.moves_made < self.win_with_least_moves_made
                                                else self.win_with_least_moves_made)
                     print(f"{games_completed}'s Game Won, Congrats (〃￣︶￣)人(￣︶￣〃)")
-
                     if self.stop_after_win:
-                        return self.create_stats()
+                        break
+
                     self.reset_board(smiley_pos)
 
-    def create_stats(self) -> dict[str, any]:
+        return self.create_stats(games_completed)
+
+    def create_stats(self, games_completed: int) -> dict[str, any]:
         stats = {
-            'Games played': self.play_games,
+            'Games played': games_completed,
             'Wins': self.wins,
-            'Losses': self.play_games - self.wins,
-            'Win percentage': self.wins/self.play_games,
+            'Losses': games_completed - self.wins,
+            'Win percentage': self.wins/games_completed,
             'Win with least Moves made': self.win_with_least_moves_made
         }
         return stats
