@@ -180,7 +180,6 @@ class MineSweeperSolver:
             self,
             next_move_strategy: Optional[Callable[["MineSweeperSolver"], None]],
             user_enters_username: bool = True,
-            window_size: Optional[int] = None
     ) -> dict[str, any]:
         """
             Execute the interactive Minesweeper solver loop until the configured number
@@ -214,10 +213,6 @@ class MineSweeperSolver:
             :param user_enters_username:
                 If True, waits for user input after a win so the user can declare a username
                 (for scoreboards, logging, or UI). If False, execution proceeds automatically.
-
-            :param window_size:
-                Window size for calculating rolling consistency. If None, it is automatically chosen
-                as max(games_completed // 30, 3) to ensure a meaningful number of windows.
 
             :return:
                 Dictionary with keys 'history' and 'stats'. These represent raw per-game data
@@ -290,7 +285,7 @@ class MineSweeperSolver:
             self.moves_made = 0
             self.reset_board(smiley_pos)
 
-        return self.create_stats(games_completed, window_size)
+        return self.create_stats(games_completed)
 
     def reset_board(self, smiley_pos: Point[int, int]):
         mouse.move(smiley_pos.x, smiley_pos.y)
@@ -379,7 +374,7 @@ class MineSweeperSolver:
             )
         )
 
-    def create_stats(self, games_completed: int, window_size: Optional[int]) -> dict[str, any]:
+    def create_stats(self, games_completed: int) -> dict[str, any]:
         """
         Compute and return summary statistics for all completed games.
 
@@ -436,15 +431,6 @@ class MineSweeperSolver:
                         Total time spent playing all games (seconds).
                     "avg_timer_per_game_won" : float
                         Average duration of games where the bot won (seconds).
-
-            "consistency" : float
-                Rolling-window consistency metric. Calculated using a sliding window of size
-                "consistency_window". Values close to 0 indicate stable performance across games;
-                larger absolute values indicate more variability between windows.
-
-            "window_size" : int
-                The window size used for rolling win-rate calculation. Automatically selected
-                if not provided. Used in computing "consistency".
         """
         wins = sum(1 for game in self.game_history if game.result == "win")
         total_moves = sum(game.total_moves for game in self.game_history)
@@ -472,9 +458,6 @@ class MineSweeperSolver:
             default=None
         )
 
-        # Calculating consistency
-        window_size = max(games_completed // 15, 3) if not window_size else window_size
-        consistency = self.calculate_consistency([1 if g.result == 'win' else -1 for g in self.game_history ])
         stats = {
             "games_played": games_completed,
             "wins": wins,
@@ -499,8 +482,6 @@ class MineSweeperSolver:
                 "avg_time_per_game": round(avg_time, 3),
                 "avg_timer_per_game_won": round(avg_timer_per_game_won, 3),
             },
-            "consistency": round(consistency, 3),
-            "window_size": window_size
         }
 
         return stats
@@ -542,22 +523,6 @@ class MineSweeperSolver:
             return locateCenterOnScreen(image_path, region=region)
         except ImageNotFoundException:
             return None
-
-    @staticmethod
-    def calculate_consistency(result, k=5) -> float | None:
-        """Calculates the average deviation using a rolling window (k)"""
-        rates = []
-        for i in range(len(result) - k + 1):
-            window = result[i:i+k]
-            rate = sum(window)/k
-            rates.append(rate)
-
-        if len(rates) <= 0:
-            warnings.warn("Not enough games played to calculated consistency.")
-            return None
-
-        mean = sum(rates) / len(rates)
-        return sum((r-mean)for r in rates)/len(rates)
 
 
 if __name__ == '__main__':
