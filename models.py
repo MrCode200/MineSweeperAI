@@ -1,6 +1,7 @@
+import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import NamedTuple
+from typing import NamedTuple, Literal
 
 
 class Point(NamedTuple):
@@ -35,3 +36,10 @@ class Field:
     pos_to_board: Point[int, int]
     id: int
     value: FieldValue = FieldValue.UNDISCOVERED
+
+@dataclass
+class GameResult:
+    id: int
+    result: Literal['win', 'loss']
+    total_moves: int
+    time_played: float
