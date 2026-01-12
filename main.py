@@ -99,7 +99,8 @@ def main():
         next_move_strategy=next_move,
         user_enters_username=True
     )
-    pprint(stats)
+    print()
+    pprint(stats, sort_dicts=False)
 
 
 if __name__ == '__main__':

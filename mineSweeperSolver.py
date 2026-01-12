@@ -91,7 +91,7 @@ class MineSweeperSolver:
         self.origin_field_pos = self._locate_image('first_field')
         self.smiley_pos = self._locate_image('happy_smiley')
 
-        if not self.origin_pos or not self.smiley_pos:
+        if not self.origin_field_pos or not self.smiley_pos:
             raise RuntimeError(
                 "Failed to detect Minesweeper game window.\n"
                 "Ensure:\n"
@@ -271,22 +271,23 @@ class MineSweeperSolver:
             games_completed += 1
             game_duration = time.time() - game_start_time if game_start_time else 0
             self._log_game(game_id=games_completed, game_result='win', game_duration=game_duration)
-            game_start_time = 0
-            self.moves_made = 0
 
             if status == 'loss':
-                print(f"{games_completed}'s Game Lost ( ´･･)ﾉ(._.`), Restarting... ")
+                print(f"{games_completed}'s Game Lost {game_duration:.2f} seconds, in {self.moves_made} moves. "
+                      f"( ´･･)ﾉ(._.`), ... ")
 
             elif 'win':
                 print(
-                    f"{games_completed}'s Game Won in {game_duration:.2f} seconds, in {self.moves_made} moves."
-                    f"\nCongrats (〃￣︶￣)人(￣︶￣〃)"
+                    f"{games_completed}'s Game Won in {game_duration:.2f} seconds, in {self.moves_made} moves. "
+                    f"Congrats (〃￣︶￣)人(￣︶￣〃)"
                 )
 
                 self.best_win_moves = min(self.moves_made, self.best_win_moves)
                 if self.stop_after_win:
                     break
 
+            game_start_time = 0
+            self.moves_made = 0
             self.reset_board(smiley_pos)
 
         return self.create_stats(games_completed, window_size)
@@ -360,10 +361,10 @@ class MineSweeperSolver:
         screenshot = self.sct.grab(self.smiley_region)
 
         if screenshot.pixel(*self.DEAD_SMILEY_MOUTH_CORNER_POS) == self.BLACK:
-            return 'win'
+            return 'loss'
 
         if screenshot.pixel(*self.COOL_SMILEY_GLASSES_CENTER_POS) == self.BLACK:
-            return 'loss'
+            return 'win'
 
         return 'ongoing'
 
@@ -486,7 +487,7 @@ class MineSweeperSolver:
         )
 
         # Calculating consistency
-        window_size = max(games_completed // 30, 3) if not window_size else window_size
+        window_size = max(games_completed // 15, 3) if not window_size else window_size
         consistency = self.calculate_consistency([1 if g.result == 'win' else -1 for g in self.game_history ])
         stats = {
             "games_played": games_completed,
@@ -560,13 +561,17 @@ class MineSweeperSolver:
             return None
 
     @staticmethod
-    def calculate_consistency(result, k=5):
+    def calculate_consistency(result, k=5) -> float | None:
         """Calculates the average deviation using a rolling window (k)"""
         rates = []
         for i in range(len(result) - k + 1):
             window = result[i:i+k]
             rate = sum(window)/k
             rates.append(rate)
+
+        if len(rates) <= 0:
+            warnings.warn("Not enough games played to calculated consistency.")
+            return None
 
         mean = sum(rates) / len(rates)
         return sum((r-mean)for r in rates)/len(rates)
