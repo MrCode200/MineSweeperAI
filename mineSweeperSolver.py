@@ -382,9 +382,6 @@ class MineSweeperSolver:
         ----------
         games_completed : int
             Total number of games played in this run. Should match the size of `self.game_history`.
-        window_size : int, optional
-            Window size for calculating rolling consistency. If None, it is automatically chosen
-            as max(games_completed // 30, 3) to ensure a meaningful number of windows.
 
         Returns
         -------
@@ -450,13 +447,18 @@ class MineSweeperSolver:
 
         # Time Calculations
         total_time = sum(game.time_played for game in self.game_history)
-        avg_time = total_time / games_completed if games_completed > 0 else 0
-        avg_timer_per_game_won = sum(game.time_played for game in self.game_history if game.result == 'win')/wins
+        avg_timer_per_game_won = round(
+            sum(
+                game.time_played for game in self.game_history if game.result == 'win'
+            ) / wins,
+            ndigits=3
+        ) if wins < 0 else None
 
         fastest_win_time = min(
             (game.time_played for game in self.game_history if game.result == 'win'),
             default=None
         )
+        fastest_win_time = round(fastest_win_time, 3) if fastest_win_time is not None else None
 
         stats = {
             "games_played": games_completed,
@@ -474,13 +476,12 @@ class MineSweeperSolver:
 
             "best_results": {
                 "least_moves_played_win": self.best_win_moves,
-                "fastest_win_time": round(fastest_win_time, 3) if fastest_win_time is not None else None,
+                "fastest_win_time": fastest_win_time,
             },
 
             "timing": {
                 "total_time": round(total_time, 3),
-                "avg_time_per_game": round(avg_time, 3),
-                "avg_timer_per_game_won": round(avg_timer_per_game_won, 3),
+                "avg_timer_per_game_won": avg_timer_per_game_won,
             },
         }
 
@@ -530,6 +531,7 @@ if __name__ == '__main__':
     from line_profiler import LineProfiler
 
     keyboard.wait('enter')
+
 
     def next_move(solver: MineSweeperSolver):
         """Random move strategy for testing."""

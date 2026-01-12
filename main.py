@@ -1,7 +1,7 @@
 import random
-from pprint import pprint
 
 import keyboard
+from rich.pretty import pprint
 
 from mineSweeperSolver import MineSweeperSolver
 from models import FieldValue, Field
@@ -100,7 +100,7 @@ def main():
         user_enters_username=True
     )
     print()
-    pprint(stats, sort_dicts=False)
+    pprint(stats, expand_all=True)
 
 
 if __name__ == '__main__':
