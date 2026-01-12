@@ -1,3 +1,4 @@
+import hashlib
 import time
 import warnings
 from itertools import groupby
@@ -222,67 +223,109 @@ class MineSweeperSolver:
             :raises ValueError:
                 If UI navigation fails (example: failed to detect smiley/reset controls).
             """
-        if user_enters_username and not self.stop_after_win:
-            raise AttributeError("user_enters_username = True only works if stop_after_win = True")
+        # -------- VALIDATION --------
         if user_enters_username:
             warnings.warn(
-                "This may falsify the statistics, as the last game will only end, "
-                "after the user has entered their Username."
-                "Meanwhile the solver continues to run in the background..."
+                "user_enters_username set to True, will falsify the statistics based on Time"
+                "\n Its possible to fix i am too lazy"
+                "\n If you want its a good challenge :))"
             )
+            print("READ THE RED WARNING MESSAGE!!!!")
+            time.sleep(1)
 
+
+        # -------- INITIAL STATE --------
         games_completed = 0
+        last_game_status = None
+        last_board_hash = None
         game_start_time = None
-        last_game_status = ""
+        board_hash = ""
+        retry_count = 0
+        MAX_HASH_RETRIES = 999
 
         smiley_pos = self._locate_image('happy_smiley')
         if smiley_pos is None:
-            raise ValueError("Smiley not found")
+            raise ValueError("Smiley not found on screen")
 
-        # Main game loop
+        # -------- MAIN EXECUTION LOOP --------
         while games_completed < self.play_games:
+            skip_turn = False
             status = self.check_game_status()
+
+            # Detect new game start
             if status == 'ongoing' and last_game_status != 'ongoing':
                 game_start_time = time.time()
 
-            # Prevent double-counting due to timing (the solver is too fast hehehe...)
+            # Avoid double-counting win/loss frames
             if status == last_game_status and status != 'ongoing':
                 continue
+
             last_game_status = status
 
+            # -------- UPDATE BOARD WHEN ACTIVE --------
+            if status == 'ongoing':
+                while retry_count <= MAX_HASH_RETRIES - 1:
+                    # Press 'esc' for Pop up to dissapear
+                    if not user_enters_username:
+                        keyboard.press('esc')
+
+                    # Check if website hasn't updated
+                    self._update_board()
+                    board_hash = hashlib.sha256(
+                        bytes(field.value.value + 2 for row in self.board for field in row)
+                    ).hexdigest()
+
+                    if board_hash != last_board_hash:
+                        last_board_hash = board_hash
+                        break
+
+                    retry_count += 1
+                    skip_turn = True
+                    break
+
+                else:
+                    # MAX_RETRY exhausted; force progression
+                    print("Board unchanged for too long; continuing anyway. (_　_)。゜zｚＺ")
+                    last_board_hash = board_hash
+
+            if skip_turn:
+                continue
+            retry_count = 0
+            # -------- EXECUTE STRATEGY MOVE --------
             next_move_strategy(self)
-            self.moves_made += 1
             self.total_moves += 1
 
-            # In case you beat highscore press 'esc' to be able to view new status
-            if not user_enters_username:
-                keyboard.press('esc')
-
-            # --- status logic ---
-            if status == 'ongoing':
-                self._update_board()
+            if status == "ongoing":
                 continue
 
+            # -------- GAME COMPLETED --------
             games_completed += 1
-            game_duration = time.time() - game_start_time if game_start_time else 0
-            self._log_game(game_id=games_completed, game_result=status, game_duration=game_duration)
+            duration = time.time() - game_start_time if game_start_time else 0
+            self._log_game(
+                game_id=games_completed,
+                game_result=status,
+                game_duration=duration
+            )
 
             if status == 'loss':
-                print(f"{games_completed}'s Game Lost {game_duration:.2f} seconds, in {self.moves_made} moves. "
-                      f"( ´･･)ﾉ(._.`), ... ")
-
-            elif 'win':
                 print(
-                    f"{games_completed}'s Game Won in {game_duration:.2f} seconds, in {self.moves_made} moves. "
-                    f"Congrats (〃￣︶￣)人(￣︶￣〃)"
+                    f"{games_completed}'s Game Lost {duration:.2f} seconds, "
+                    f"in {self.moves_made} moves. " f"( ´･･)ﾉ(._.), ... "
                 )
 
+            elif status == 'win':
+                print(
+                    f"{games_completed}'s Game Won in {duration:.2f} seconds, "
+                    f"in {self.moves_made} moves. " f"Congrats (〃￣︶￣)人(￣︶￣〃)"
+                )
                 self.best_win_moves = min(self.moves_made, self.best_win_moves)
+
                 if self.stop_after_win:
                     break
 
-            game_start_time = 0
+            # Reset for next match
             self.moves_made = 0
+            game_start_time = None
             self.reset_board(smiley_pos)
 
         return self.create_stats(games_completed)
@@ -452,7 +495,7 @@ class MineSweeperSolver:
                 game.time_played for game in self.game_history if game.result == 'win'
             ) / wins,
             ndigits=3
-        ) if wins < 0 else None
+        ) if wins > 0 else None
 
         fastest_win_time = min(
             (game.time_played for game in self.game_history if game.result == 'win'),
@@ -487,16 +530,16 @@ class MineSweeperSolver:
 
         return stats
 
-    # --- Static Utility Methods ---
-    @staticmethod
-    def click_field(field: Field) -> None:
+    # --- Utility Methods ---
+    def click_field(self, field: Field) -> None:
         """Execute left-click on the specified field."""
+        self.moves_made += 1
         mouse.move(*field.pos_to_screen)
         mouse.click()
 
-    @staticmethod
-    def toggle_flag(field: Field) -> None:
+    def toggle_flag(self, field: Field) -> None:
         """Toggle flag on the specified field via right-click."""
+        self.moves_made += 1
         field.value = (
             FieldValue.FLAGGED if field.value != FieldValue.FLAGGED
             else FieldValue.UNDISCOVERED
