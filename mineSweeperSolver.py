@@ -270,7 +270,7 @@ class MineSweeperSolver:
 
             games_completed += 1
             game_duration = time.time() - game_start_time if game_start_time else 0
-            self._log_game(game_id=games_completed, game_result='win', game_duration=game_duration)
+            self._log_game(game_id=games_completed, game_result=status, game_duration=game_duration)
 
             if status == 'loss':
                 print(f"{games_completed}'s Game Lost {game_duration:.2f} seconds, in {self.moves_made} moves. "
@@ -418,12 +418,8 @@ class MineSweeperSolver:
                 Movement-related metrics:
                     "total_moves" : int
                         Sum of all moves taken across all games.
-                    "total_moves_wins" : int
-                        Sum of moves taken in winning games.
                     "avg_moves_win" : float
                         Average number of moves required to win.
-                    "total_moves_losses" : int
-                        Sum of moves taken in losing games.
                     "avg_moves_loss" : float
                         Average number of moves required to lose.
 
@@ -438,12 +434,8 @@ class MineSweeperSolver:
                 Execution time metrics:
                     "total_time" : float
                         Total time spent playing all games (seconds).
-                    "avg_time_per_game" : float
-                        Average duration per game (seconds).
-                    "fastest_game" : float
-                        Duration of the fastest game (seconds).
-                    "slowest_game" : float
-                        Duration of the slowest game (seconds).
+                    "avg_timer_per_game_won" : float
+                        Average duration of games where the bot won (seconds).
 
             "consistency" : float
                 Rolling-window consistency metric. Calculated using a sliding window of size
@@ -473,14 +465,8 @@ class MineSweeperSolver:
         # Time Calculations
         total_time = sum(game.time_played for game in self.game_history)
         avg_time = total_time / games_completed if games_completed > 0 else 0
-        fastest_game = min(
-            (game.time_played for game in self.game_history),
-            default=None
-        )
-        slowest_game = max(
-            (game.time_played for game in self.game_history),
-            default=None
-        )
+        avg_timer_per_game_won = sum(game.time_played for game in self.game_history if game.result == 'win')/wins
+
         fastest_win_time = min(
             (game.time_played for game in self.game_history if game.result == 'win'),
             default=None
@@ -499,24 +485,21 @@ class MineSweeperSolver:
 
             "moves": {
                 "total_moves": total_moves,
-                "total_moves_wins": total_win_moves,
-                "avg_moves_win": total_win_moves / wins if wins else 0,
-                "total_moves_losses": total_loss_moves,
-                "avg_moves_loss": total_loss_moves / losses if losses else 0,
+                "avg_moves_win": round(total_win_moves / wins if wins else 0, 3),
+                "avg_moves_loss": round(total_loss_moves / losses if losses else 0, 3),
             },
 
             "best_results": {
                 "least_moves_played_win": self.best_win_moves,
-                "fastest_win_time": fastest_win_time,
+                "fastest_win_time": round(fastest_win_time, 3) if fastest_win_time is not None else None,
             },
 
             "timing": {
-                "total_time": total_time,
-                "avg_time_per_game": avg_time,
-                "fastest_game": fastest_game,
-                "slowest_game": slowest_game,
+                "total_time": round(total_time, 3),
+                "avg_time_per_game": round(avg_time, 3),
+                "avg_timer_per_game_won": round(avg_timer_per_game_won, 3),
             },
-            "consistency": consistency,
+            "consistency": round(consistency, 3),
             "window_size": window_size
         }
 
@@ -581,6 +564,7 @@ if __name__ == '__main__':
     import random
     from line_profiler import LineProfiler
 
+    keyboard.wait('enter')
 
     def next_move(solver: MineSweeperSolver):
         """Random move strategy for testing."""
@@ -595,7 +579,7 @@ if __name__ == '__main__':
 
     ms_solver = MineSweeperSolver(
         difficulty="beginner",
-        play_games=260,
+        play_games=500,
     )
 
     # Option 1: Run normally
